@@ -1,0 +1,7 @@
+README
+Changes
+Makefile.PL
+lib/Spreadsheet/ParseExcel_XLHTML.pm
+MANIFEST
+test.pl
+xlhtml-0.3.9.6.patch
