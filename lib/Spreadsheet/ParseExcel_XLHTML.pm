@@ -1,6 +1,6 @@
 package Spreadsheet::ParseExcel_XLHTML;
 
-$VERSION = 0.01;
+$VERSION = 0.02;
 @ISA = qw(Spreadsheet::ParseExcel);
 
 =head1 NAME
@@ -15,15 +15,26 @@ Spreadsheet::ParseExcel_XLHTML - Parse Excel Spreadsheets using xlhtml
 
 	my $book = $excel->Parse('/some/excel/file.xls');
 
+	# Cheesy CSV printer...
 	for my $sheet (@{$book->{Worksheet}}) {
-		print "Worksheet: ", $sheet->{Name}, "\n";
-		for (my $i = $sheet->{MinRow}; $i <= $sheet->{MaxRow} ; $i++) {
+		print STDERR "Worksheet: ", $sheet->{Name}, "\n";
+		for my $i ($sheet->{MinRow}..$sheet->{MaxRow}) {
 			print join ',', map { qq|"$_"| }
-					map { defined $_ && $_->Value ? $_->Value : "" }
+					map { defined $_ ? $_->Value : "" }
 					@{$sheet->{Cells}[$i]};
 			print "\n";
 		}
 	}
+
+	# or...
+
+	use Spreadsheet::ParseExcel_XLHTML qw/-install/;
+
+	# Calls to Spreadsheet::ParseExcel's constructor will now be forwarded
+	# to this module.
+	my $excel = new Spreadsheet::ParseExcel;
+
+	#...
 
 =head1 DESCRIPTION
 
@@ -33,26 +44,76 @@ reason I wrote it was to have a faster way to parse Excel spreadsheets in Perl.
 This module parses around six times faster according to my own informal
 benchmarks then the original Spreadsheet::ParseExcel at the time of writing.
 
-To achieve this, it uses a utility called "xlhtml", which you can find here:
+To achieve this, it uses a program called "xlhtml" by Stev Grubb. You can find
+it here:
 
 	http://www.xlhtml.org/
 
-Get the latest developer release, I've included a patch for 0.3.9.6 that fixes
-a couple minor issues, just in case. Don't apply it for a later version.  Once
-compiled, it needs to be in the PATH of your Perl program for this module to
-work correctly.
+Get the latest developer release. Once compiled, it needs to be in the PATH of
+your Perl program for this module to work correctly.
 
 You only need to use this module if you have a large volume of big Excel
-spreadsheets that you are parsing, otherwise stick to the
-Spreadsheet::ParseExcel module.
+spreadsheets that you are parsing, or perhaps need to speed up a CGI/mod_perl
+handler. Otherwise stick to the Spreadsheet::ParseExcel module.
+
+Now, someday we will have a nice C library with an XS interface, but this is
+not someday :)
+
+=head1 COMPATIBILITY
+
+The workbook 'Author' attribute is supported, and the following worksheet
+attributes are supported: 'Name', 'MinRow', 'MaxRow', 'MinCol', 'MaxCol'.
+
+In terms of behaviour, there is one other difference which may or may not
+affect you. Spreadsheet::ParseExcel will often create
+Spreadsheet::ParseExcel::Cell objects with empty or whitespace-filled Value
+fields, while this module will only create Cell objects if a value exists;
+otherwise the Cells array will contain an C<undef> for that cell.
+
+In other words, don't blindly call C<$sheet->{Cells}[i,j]->Value>, check if the
+cell is defined first.
+
+=head1 OPTIONS
+
+When used with the C<-install> (dash optional) option, it will install its own
+"new" and "Parse" methods into the Spreadsheet::ParseExcel namespace, useful if
+you want to try using this module along with modules that depend on the
+Spreadsheet::ParseExcel module, and/or minimize changes to your code for
+compatibility.
 
 =cut
 
 use strict;
 use IO::File;
 use Spreadsheet::ParseExcel;
+use HTML::Entities;
 
-sub new($;%) {
+sub import {
+	my $pkg    = shift;
+	return unless @_;
+	my $option = shift;
+
+	$option =~ s/^-//;
+
+	if ($option eq 'install') {
+		no strict 'refs';
+
+# Perl will complain about mismatched prototypes...so turn off warnings, in a
+# compatible fashion.
+		local $^W = undef;
+
+# Trick Spreadsheet::ParseExcel into calling our constructor and blessing the
+# object into this package, also overwriteh the Parse method. Evil, I know :)
+		*{Spreadsheet::ParseExcel::new}   = sub ($;%) {
+			shift;
+			new (__PACKAGE__, @_);
+		};
+
+		*{Spreadsheet::ParseExcel::Parse} = \&Parse;
+	}
+}
+
+sub new ($;%) {
 	my ($class, %args) = @_;
 	$class		   = ref $class || $class;
 
@@ -61,7 +122,7 @@ sub new($;%) {
 	return $self;
 }
 
-sub Parse($$;$) {
+sub Parse ($$;$) {
 	my ($self, $file) = @_;
 
 	$file = $self->_getFileByObject($file);
@@ -79,8 +140,8 @@ sub Parse($$;$) {
 
 	while (<$stream>) {
 		chomp;
-# Some versions have a bug with the NotImplemented tag getting translated into
-# entities...
+# Some versions of xlhtml have a bug with the NotImplemented tag getting
+# translated into entities...
 		s/\&lt;NotImplemented\/\&gt;//;
 
 		/<cell \s* row="(\d+)" \s* col="(\d+)">
@@ -91,7 +152,7 @@ sub Parse($$;$) {
 			next if $3 =~ /^\s*$/;
 
 			$cells->[$1][$2] = bless {
-				_Value => parseEntities($3)
+				_Value => decode_entities($3)
 			}, 'Spreadsheet::ParseExcel::Cell';
 			next;
 		};
@@ -103,7 +164,7 @@ sub Parse($$;$) {
 		};
 		/<pagetitle> (?:<[^<>]*>)* ( \s* (?:[^<\s]+\s*?)* )\s*
 		</x && do {
-			$sheet->{Name} = parseEntities($1); next;
+			$sheet->{Name} = decode_entities($1); next;
 		};
 		/<firstrow>(\d+)<\/firstrow>/ && do {
 			$sheet->{MinRow} = $1; next;
@@ -126,14 +187,6 @@ sub Parse($$;$) {
 	$work_book->{Worksheet} = \@work_sheets;
 
 	return $work_book;
-}
-
-sub parseEntities {
-	$_ = shift;
-	if (/&/) {
-		s/&quot;/"/g; s/&amp;/&/g; s/&gt;/>/; s/&lt;/</;
-	}
-	return $_;
 }
 
 sub DESTROY {
@@ -167,7 +220,7 @@ sub _getFileByObject {
 	return $file;
 }
 
-1;
+q|The road goes ever on and on...|;
 
 __END__
 
@@ -191,7 +244,7 @@ as free software.
 
 =head1 BUGS
 
-Probably a few.
+are tasty!
 
 =head1 TODO
 

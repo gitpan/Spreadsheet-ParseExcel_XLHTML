@@ -9,15 +9,26 @@ SYNOPSIS
 
             my $book = $excel->Parse('/some/excel/file.xls');
 
+            # Cheesy CSV printer...
             for my $sheet (@{$book->{Worksheet}}) {
-                    print "Worksheet: ", $sheet->{Name}, "\n";
-                    for (my $i = $sheet->{MinRow}; $i <= $sheet->{MaxRow} ; $i++) {
+                    print STDERR "Worksheet: ", $sheet->{Name}, "\n";
+                    for my $i ($sheet->{MinRow}..$sheet->{MaxRow}) {
                             print join ',', map { qq|"$_"| }
-                                            map { defined $_ && $_->Value ? $_->Value : "" }
+                                            map { defined $_ ? $_->Value : "" }
                                             @{$sheet->{Cells}[$i]};
                             print "\n";
                     }
             }
+
+            # or...
+
+            use Spreadsheet::ParseExcel_XLHTML qw/-install/;
+
+            # Calls to Spreadsheet::ParseExcel's constructor will now be forwarded
+            # to this module.
+            my $excel = new Spreadsheet::ParseExcel;
+
+            #...
 
 DESCRIPTION
     This module follows the interface of the Spreadsheet::ParseExcel
@@ -27,19 +38,44 @@ DESCRIPTION
     times faster according to my own informal benchmarks then the
     original Spreadsheet::ParseExcel at the time of writing.
 
-    To achieve this, it uses a utility called "xlhtml", which you can
-    find here:
+    To achieve this, it uses a program called "xlhtml" by Stev Grubb.
+    You can find it here:
 
             http://www.xlhtml.org/
 
-    Get the latest developer release, I've included a patch for 0.3.9.6
-    that fixes a couple minor issues, just in case. Don't apply it for a
-    later version. Once compiled, it needs to be in the PATH of your
-    Perl program for this module to work correctly.
+    Get the latest developer release. Once compiled, it needs to be in
+    the PATH of your Perl program for this module to work correctly.
 
     You only need to use this module if you have a large volume of big
-    Excel spreadsheets that you are parsing, otherwise stick to the
+    Excel spreadsheets that you are parsing, or perhaps need to speed up
+    a CGI/mod_perl handler. Otherwise stick to the
     Spreadsheet::ParseExcel module.
+
+    Now, someday we will have a nice C library with an XS interface, but
+    this is not someday :)
+
+COMPATIBILITY
+    The workbook 'Author' attribute is supported, and the following
+    worksheet attributes are supported: 'Name', 'MinRow', 'MaxRow',
+    'MinCol', 'MaxCol'.
+
+    In terms of behaviour, there is one other difference which may or
+    may not affect you. Spreadsheet::ParseExcel will often create
+    Spreadsheet::ParseExcel::Cell objects with empty or
+    whitespace-filled Value fields, while this module will only create
+    Cell objects if a value exists; otherwise the Cells array will
+    contain an "undef" for that cell.
+
+    In other words, don't blindly call "$sheet-"{Cells}[i,j]->Value>,
+    check if the cell is defined first.
+
+OPTIONS
+    When used with the "-install" (dash optional) option, it will
+    install its own "new" and "Parse" methods into the
+    Spreadsheet::ParseExcel namespace, useful if you want to try using
+    this module along with modules that depend on the
+    Spreadsheet::ParseExcel module, and/or minimize changes to your code
+    for compatibility.
 
 AUTHOR
     Rafael Kitover (caelum@debian.org)
@@ -57,7 +93,7 @@ ACKNOWLEDGEMENTS
     projects as free software.
 
 BUGS
-    Probably a few.
+    are tasty!
 
 TODO
     I'll take suggestions.
