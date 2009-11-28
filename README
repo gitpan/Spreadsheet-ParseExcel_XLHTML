@@ -2,32 +2,31 @@ NAME
     Spreadsheet::ParseExcel_XLHTML - Parse Excel Spreadsheets using xlhtml
 
 SYNOPSIS
-            use Spreadsheet::ParseExcel_XLHTML;
+        use Spreadsheet::ParseExcel_XLHTML;
 
-            my $excel = new Spreadsheet::ParseExcel_XLHTML;
+        my $excel = Spreadsheet::ParseExcel_XLHTML->new;
 
-            my $book = $excel->Parse('/some/excel/file.xls');
+        my $book = $excel->Parse('/some/excel/file.xls');
 
-            # Cheesy CSV printer...
-            for my $sheet (@{$book->{Worksheet}}) {
-                    print STDERR "Worksheet: ", $sheet->{Name}, "\n";
-                    for my $i ($sheet->{MinRow}..$sheet->{MaxRow}) {
-                            print join ',', map { qq|"$_"| }
-                                            map { defined $_ ? $_->Value : "" }
-                                            @{$sheet->{Cells}[$i]};
-                            print "\n";
-                    }
-            }
+        # Cheesy CSV printer...
+        for my $sheet (@{$book->{Worksheet}}) {
+                print STDERR "Worksheet: ", $sheet->{Name}, "\n";
+                for my $i ($sheet->{MinRow}..$sheet->{MaxRow}) {
+                        print join ',', map { qq|"$_"| }
+                                        map { defined $_ ? $_->Value : "" }
+                                        @{$sheet->{Cells}[$i]};
+                        print "\n";
+                }
+        }
 
-            # or...
+        # or...
 
-            use Spreadsheet::ParseExcel_XLHTML qw/-install/;
+        use Spreadsheet::ParseExcel_XLHTML qw/-install/;
 
-            # Calls to Spreadsheet::ParseExcel's constructor will now be forwarded
-            # to this module.
-            my $excel = new Spreadsheet::ParseExcel;
+        # then use the Spreadsheet::ParseExcel API
 
-            #...
+        my $book  = Spreadsheet::ParseExcel::Workbook->parse('/some/file.xls');
+        my $sheet = $book->{Worksheet}[0];
 
 DESCRIPTION
     This module follows the interface of the Spreadsheet::ParseExcel module,

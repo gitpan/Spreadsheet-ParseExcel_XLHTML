@@ -4,6 +4,8 @@ author:
   - 'Rafael Kitover <rkitover@cpan.org>'
 build_requires:
   ExtUtils::MakeMaker: 6.42
+  Spreadsheet::WriteExcel: 0
+  Test::More: 0
 configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
@@ -20,10 +22,11 @@ no_index:
 provides:
   Spreadsheet::ParseExcel_XLHTML:
     file: lib/Spreadsheet/ParseExcel_XLHTML.pm
-    version: 0.03
+    version: 0.04
 requires:
+  HTML::Entities: 0
   Spreadsheet::ParseExcel: 0
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://github.com/rkitover/spreadsheet-parseexcel-xlhtml.git
-version: 0.03
+version: 0.04
